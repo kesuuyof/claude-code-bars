@@ -82,7 +82,9 @@ export const register: Register = (on, options) => {
       barWidth(cap, e.props.bodyColumns),
     )
     const level = levelColor(snap.percent)
-    const indent = ' '.repeat(BAR_INDENT)
+    // A box of fixed width, not spaces: in a proportional font spaces are narrower
+    // than usage-bar's "5h " label, and the bars would not start in one column.
+    const indent = <Box width={BAR_INDENT} flexShrink={0} />
 
     return (
       <Box flexDirection="column">
@@ -93,23 +95,27 @@ export const register: Register = (on, options) => {
           </Text>
           {snap.autoCompactAt === null ? '' : ` · auto-compact at ${fmt(snap.autoCompactAt)}`}
         </Text>
-        <Text wrap="truncate-end">
+        <Box flexDirection="row">
           {indent}
-          {snap.segments.map((s, i) => {
-            const n = cells[i] ?? 0
-            return n > 0 ? <Text {...tone(s)}>{CELL.repeat(n)}</Text> : ''
-          })}
-        </Text>
-        <Text wrap="truncate-end">
+          <Text wrap="truncate-end">
+            {snap.segments.map((s, i) => {
+              const n = cells[i] ?? 0
+              return n > 0 ? <Text {...tone(s)}>{CELL.repeat(n)}</Text> : ''
+            })}
+          </Text>
+        </Box>
+        <Box flexDirection="row">
           {indent}
-          {snap.segments
-            .filter(s => s.tokens > 0)
-            .map(s => (
-              <Text>
-                <Text {...tone(s)}>{CELL}</Text> {s.name} {fmt(s.tokens)}{'  '}
-              </Text>
-            ))}
-        </Text>
+          <Text wrap="truncate-end">
+            {snap.segments
+              .filter(s => s.tokens > 0)
+              .map(s => (
+                <Text>
+                  <Text {...tone(s)}>{CELL}</Text> {s.name} {fmt(s.tokens)}{'  '}
+                </Text>
+              ))}
+          </Text>
+        </Box>
         {below}
       </Box>
     )

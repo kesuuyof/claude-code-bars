@@ -1,6 +1,6 @@
 {
   "name": "context-bar",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "A stacked bar above the prompt showing the context window by /context category.",
   "author": {
     "name": "kesuuyof"

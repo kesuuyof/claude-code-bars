@@ -68,7 +68,9 @@ export const register: Register = (on, options) => {
     const { Box, Text } = $.ui.resolve(e)
     const now = await read($, clock)
     const rows = list.map(l => toRow(l, now))
-    // A label longer than the grid's indent ("7d opus") pushes this band's bars right of it.
+    // The label sits in a box of fixed width, so the bar starts in the same column
+    // as context-bar's whatever font draws the label. A label longer than the
+    // grid's indent ("7d opus") widens this band's box and pushes its bars right.
     const indent = Math.max(BAR_INDENT, ...rows.map(r => r.label.length + 1))
     const width = barWidth(cap, e.props.bodyColumns)
 
@@ -80,20 +82,26 @@ export const register: Register = (on, options) => {
           const level = levelColor(r.used)
           const tone = level ? { color: level } : {}
           const row = (
-            <Text wrap="truncate-end">
-              {r.label.padEnd(indent)}
-              <Text {...tone}>{CELL.repeat(filled)}</Text>
-              <Text dimColor>{CELL.repeat(empty)}</Text>
-              <Text {...tone}>{r.tail}</Text>
-            </Text>
+            <Box flexDirection="row">
+              <Box width={indent} flexShrink={0}>
+                <Text>{r.label}</Text>
+              </Box>
+              <Text wrap="truncate-end">
+                <Text {...tone}>{CELL.repeat(filled)}</Text>
+                <Text dimColor>{CELL.repeat(empty)}</Text>
+                <Text {...tone}>{r.tail}</Text>
+              </Text>
+            </Box>
           )
           if (r.warning === undefined) return [row]
           return [
             row,
-            <Text color="warning" wrap="truncate-end">
-              {' '.repeat(indent)}
-              {r.warning}
-            </Text>,
+            <Box flexDirection="row">
+              <Box width={indent} flexShrink={0} />
+              <Text color="warning" wrap="truncate-end">
+                {r.warning}
+              </Text>
+            </Box>,
           ]
         })}
       </Box>

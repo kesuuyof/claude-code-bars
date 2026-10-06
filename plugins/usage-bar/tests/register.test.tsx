@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
-import type { Engine, Plugin, PluginTier } from 'claude-code/testing'
+import type { ElementQuery, Engine, FoundElement, Plugin, PluginTier } from 'claude-code/testing'
 import type { On, RenderPropsOf, SessionRateLimit } from 'claude-code'
 
 const SURFACES = ['terminal', 'desktop'] as const
@@ -48,17 +48,23 @@ const toggle = ($: Engine) =>
 const mount = ($: Engine, surface: (typeof SURFACES)[number], props = BAND) =>
   $.ui.mount({ plugin: 'usage-bar', surface, component: 'AbovePrompt', props })
 
-const ROW = (name: string) => ({ type: 'Text', text: new RegExp(`^${name} `) })
 const WARNING = { type: 'Text', text: /ahead of pace/ }
+/** The band's bar rows: the width of the box a bar starts after, and what the row shows. */
+const rowsOf = async (ui: { findAll: (q: ElementQuery) => Promise<FoundElement[]> }) =>
+  (await ui.findAll({ type: 'Box' }))
+    .filter(b => b.props.flexDirection === 'row')
+    .map(b => ({ indent: (b.children[0] as { props: { width?: number } }).props.width, text: b.text }))
+/** The row of one window, by its label: "5h", then the bar. */
+const rowFor = async (ui: Parameters<typeof rowsOf>[0], label: string) =>
+  (await rowsOf(ui)).find(r => r.text.startsWith(`${label}█`))
 // full and empty cells are the same glyph, so the bar is one run of it
-const bar = (row: string) => row.match(/█+/)?.[0].length
-const barStart = (row: string) => row.search(/█/)
+const bar = (row = '') => row.match(/█+/)?.[0].length
 
 test('nothing until a response reports the windows', async ($, on) => {
   engine(on)
   await start($)
   const ui = await mount($, 'terminal')
-  expect(await ui.find(ROW('5h'))).toBeUndefined()
+  expect(await rowFor(ui, '5h')).toBeUndefined()
 })
 
 test('one bar per window, with percent and time to reset', async ($, on) => {
@@ -68,14 +74,16 @@ test('one bar per window, with percent and time to reset', async ($, on) => {
 
   for (const surface of SURFACES) {
     const ui = await mount($, surface)
-    const fiveHour = (await ui.find(ROW('5h')))?.text ?? ''
-    const sevenDay = (await ui.find(ROW('7d')))?.text ?? ''
+    const fiveHourRow = await rowFor(ui, '5h')
+    const sevenDayRow = await rowFor(ui, '7d')
+    const fiveHour = fiveHourRow?.text ?? ''
+    const sevenDay = sevenDayRow?.text ?? ''
     expect(fiveHour).toEndWith(' 25% · resets in 3h30m')
     expect(sevenDay).toEndWith(' 18% · resets in 6d0h')
     // context-bar's test pins the same numbers: a 60-column band puts both bars at 3, 32 cells long
-    for (const row of [fiveHour, sevenDay]) {
-      expect(barStart(row)).toBe(3)
-      expect(bar(row)).toBe(32)
+    for (const row of [fiveHourRow, sevenDayRow]) {
+      expect(row?.indent).toBe(3)
+      expect(bar(row?.text)).toBe(32)
     }
     expect(await ui.find(WARNING)).toBeUndefined()
     await ui.unmount()
@@ -87,7 +95,7 @@ test('bars are 40 cells by default on a wide band', async ($, on) => {
   await start($)
   await measure($, windows(25))
   const ui = await mount($, 'terminal', { ...BAND, bodyColumns: 200 })
-  expect(bar((await ui.find(ROW('5h')))?.text ?? '')).toBe(40)
+  expect(bar((await rowFor(ui, '5h'))?.text)).toBe(40)
 })
 
 test('the barWidth option sets the bar length', { options: { barWidth: 20 } }, async ($, on) => {
@@ -95,7 +103,7 @@ test('the barWidth option sets the bar length', { options: { barWidth: 20 } }, a
   await start($)
   await measure($, windows(25))
   const ui = await mount($, 'terminal', { ...BAND, bodyColumns: 200 })
-  expect(bar((await ui.find(ROW('5h')))?.text ?? '')).toBe(20)
+  expect(bar((await rowFor(ui, '5h'))?.text)).toBe(20)
 })
 
 test('empty cells are the same glyph as full ones, dimmed', async ($, on) => {
@@ -143,9 +151,9 @@ test('the countdown moves with the clock', async ($, on) => {
   const ui = await mount($, 'terminal')
 
   await clock.advance(60_000)
-  expect((await ui.find(ROW('5h')))?.text).toEndWith('resets in 3h29m')
+  expect((await rowFor(ui, '5h'))?.text).toEndWith('resets in 3h29m')
   await clock.advance(30 * 60_000)
-  expect((await ui.find(ROW('5h')))?.text).toEndWith('resets in 2h59m')
+  expect((await rowFor(ui, '5h'))?.text).toEndWith('resets in 2h59m')
 })
 
 test('/usage-bar toggles and the choice survives a /clear', async ($, on) => {
@@ -155,13 +163,13 @@ test('/usage-bar toggles and the choice survives a /clear', async ($, on) => {
   const ui = await mount($, 'terminal')
 
   expect((await toggle($)).text).toBe('Usage bars hidden.')
-  expect(await ui.find(ROW('5h'))).toBeUndefined()
+  expect(await rowFor(ui, '5h')).toBeUndefined()
   await $.classic.SessionStart({ source: 'clear' })
-  expect(await ui.find(ROW('5h'))).toBeUndefined()
+  expect(await rowFor(ui, '5h')).toBeUndefined()
 
   expect((await toggle($)).text).toBe('Usage bars shown.')
   await measure($, windows(25))
-  expect(await ui.find(ROW('5h'))).toBeDefined()
+  expect(await rowFor(ui, '5h')).toBeDefined()
 })
 
 test('a stored hide holds in the next session', async ($, on) => {
@@ -169,7 +177,7 @@ test('a stored hide holds in the next session', async ($, on) => {
   await start($)
   await measure($, windows(25))
   const ui = await mount($, 'terminal')
-  expect(await ui.find(ROW('5h'))).toBeUndefined()
+  expect(await rowFor(ui, '5h')).toBeUndefined()
 })
 
 test('yields the band to a survey', async ($, on) => {
@@ -177,7 +185,7 @@ test('yields the band to a survey', async ($, on) => {
   await start($)
   await measure($, windows(25))
   const ui = await mount($, 'terminal', { ...BAND, hasSurvey: true })
-  expect(await ui.find(ROW('5h'))).toBeUndefined()
+  expect(await rowFor(ui, '5h')).toBeUndefined()
 })
 
 /** Draws itself above the bands beneath it, as context-bar does. */
@@ -207,7 +215,7 @@ for (const tier of ['prepend', 'append'] as const) {
       const ui = await mount($, surface)
       const texts = (await ui.findAll({ type: 'Text' })).map(t => t.text)
       const context = texts.findIndex(t => t.startsWith('Context'))
-      const fiveHour = texts.findIndex(t => t.startsWith('5h '))
+      const fiveHour = texts.findIndex(t => t === '5h')
       expect(context).toBeGreaterThanOrEqual(0)
       expect(fiveHour).toBeGreaterThan(context)
       await ui.unmount()

@@ -1,5 +1,5 @@
 import { expect, mock, test } from 'claude-code/testing'
-import type { Engine } from 'claude-code/testing'
+import type { ElementQuery, Engine, FoundElement } from 'claude-code/testing'
 import type { On, RenderPropsOf, SessionContextBreakdown } from 'claude-code'
 
 const SURFACES = ['terminal', 'desktop'] as const
@@ -60,9 +60,16 @@ function engine(on: On, store: Record<string, unknown> = {}) {
 // Text takes no key, so rows are found by what they show.
 const HEADER = { type: 'Text', text: /^Context / }
 const USAGE = { type: 'Text', text: /^[\d.]+[kM]? \/ [\d.]+[kM]? \(\d+%\)$/ }
-const BAR = { type: 'Text', text: /^ *█+$/ }
-/** Where the bar starts and how many cells it takes. */
-const grid = (text = '') => ({ start: text.search(/█/), cells: text.trimStart().length })
+/** The band's bar rows: the width of the box a bar starts after, and what the row shows. */
+const rowsOf = async (ui: { findAll: (q: ElementQuery) => Promise<FoundElement[]> }) =>
+  (await ui.findAll({ type: 'Box' }))
+    .filter(b => b.props.flexDirection === 'row')
+    .map(b => ({ indent: (b.children[0] as { props: { width?: number } }).props.width, text: b.text }))
+/** Where the bar starts (the width of the box before it) and how many cells it takes. */
+const grid = async (ui: Parameters<typeof rowsOf>[0]) => {
+  const row = (await rowsOf(ui)).find(r => /^█+$/.test(r.text))
+  return { start: row?.indent, cells: row?.text.length }
+}
 const LEGEND = { type: 'Text', text: /Free space/ }
 
 /**
@@ -113,11 +120,11 @@ test('bar starts at column 3, 40 cells by default and less on a narrow band; leg
   for (const surface of SURFACES) {
     // usage-bar's test pins the same numbers: a 60-column band puts both bars at 3, 32 cells long
     const narrow = await mount($, surface)
-    expect(grid((await narrow.find(BAR))?.text)).toEqual({ start: 3, cells: 32 })
+    expect(await grid(narrow)).toEqual({ start: 3, cells: 32 })
     await narrow.unmount()
 
     const ui = await mount($, surface, { ...BAND, bodyColumns: 200 })
-    expect(grid((await ui.find(BAR))?.text)).toEqual({ start: 3, cells: 40 })
+    expect(await grid(ui)).toEqual({ start: 3, cells: 40 })
     const legend = (await ui.find(LEGEND))?.text
     expect(legend).toContain('Messages 30k')
     expect(legend).toContain('Autocompact buffer 33k')
@@ -130,7 +137,10 @@ test('one glyph for every cell: free space and the buffer are dimmed, not drawn 
   engine(on)
   await start($)
   const ui = await mount($, 'terminal', { ...BAND, bodyColumns: 200 })
-  const cells = (await ui.findAll({ type: 'Text', text: /^█+$/ })).map(t => ({ n: t.text.length, dim: t.props.dimColor === true }))
+  // the bar's segments: the colored runs of cells (the legend's swatches come after)
+  const cells = (await ui.findAll({ type: 'Text', text: /^█+$/ }))
+    .filter(t => 'color' in t.props)
+    .map(t => ({ n: t.text.length, dim: t.props.dimColor === true }))
   // System prompt, System tools, Messages; then Free space and Autocompact buffer
   expect(cells.slice(0, 5).map(c => c.dim)).toEqual([false, false, false, true, true])
   expect(cells.slice(0, 5).reduce((a, c) => a + c.n, 0)).toBe(40)
@@ -140,7 +150,7 @@ test('the barWidth option sets the bar length', { options: { barWidth: 20 } }, a
   engine(on)
   await start($)
   const ui = await mount($, 'terminal')
-  expect(grid((await ui.find(BAR))?.text).cells).toBe(20)
+  expect((await grid(ui)).cells).toBe(20)
 })
 
 test('usage turns yellow at 50% and red at 80%', async ($, on) => {
