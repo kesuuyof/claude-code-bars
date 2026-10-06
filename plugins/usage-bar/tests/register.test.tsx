@@ -50,6 +50,7 @@ const mount = ($: Engine, surface: (typeof SURFACES)[number], props = BAND) =>
 
 const ROW = (name: string) => ({ type: 'Text', text: new RegExp(`^${name} `) })
 const WARNING = { type: 'Text', text: /ahead of pace/ }
+const bar = (row: string) => row.match(/[█░]+/)?.[0].length
 
 test('nothing until a response reports the windows', async ($, on) => {
   engine(on)
@@ -69,13 +70,28 @@ test('one bar per window, with percent and time to reset', async ($, on) => {
     const sevenDay = (await ui.find(ROW('7d')))?.text ?? ''
     expect(fiveHour).toEndWith(' 25% · resets in 3h30m')
     expect(sevenDay).toEndWith(' 18% · resets in 6d0h')
-    // the bars line up, the widest row filling the band
-    const bar = (row: string) => row.match(/[█░]+/)?.[0].length
-    expect(bar(fiveHour)).toBe(bar(sevenDay))
-    expect(fiveHour).toHaveLength(WIDTH)
+    // the bars line up, short of the band by the label, the widest tail and a spare cell
+    expect(bar(fiveHour)).toBe(WIDTH - '5h '.length - ' 25% · resets in 3h30m'.length - 1)
+    expect(bar(sevenDay)).toBe(bar(fiveHour))
     expect(await ui.find(WARNING)).toBeUndefined()
     await ui.unmount()
   }
+})
+
+test('bars are 40 cells by default on a wide band', async ($, on) => {
+  engine(on)
+  await start($)
+  await measure($, windows(25))
+  const ui = await mount($, 'terminal', { ...BAND, bodyColumns: 200 })
+  expect(bar((await ui.find(ROW('5h')))?.text ?? '')).toBe(40)
+})
+
+test('the barWidth option sets the bar length', { options: { barWidth: 20 } }, async ($, on) => {
+  engine(on)
+  await start($)
+  await measure($, windows(25))
+  const ui = await mount($, 'terminal', { ...BAND, bodyColumns: 200 })
+  expect(bar((await ui.find(ROW('5h')))?.text ?? '')).toBe(20)
 })
 
 test('bar and percent turn yellow at 50% and red at 80%', async ($, on) => {

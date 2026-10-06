@@ -12,11 +12,19 @@ claude plugin install usage-bar@claude-code-bars
 
 ```
 Context 45k / 200k (23%) · auto-compact at 167k
-██████████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░▒▒▒▒▒▒▒▒
+█████████░░░░░░░░░░░░░░░░░░░░░░░░▒▒▒▒▒▒▒
 █ System prompt 3k  █ System tools 12k  █ Messages 30k  ░ Free space 122k  ▒ Autocompact buffer 33k
-5h ████████████████████████░░░░░░░░░░░ 60% · resets in 3h30m
+5h ████████████████████████░░░░░░░░░░░░░░░░ 60% · resets in 3h30m
    ⚠ ahead of pace: 60% used, 30% of the window elapsed
-7d ██████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 18% · resets in 6d0h
+7d ███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 18% · resets in 6d0h
+```
+
+### バーの長さ
+
+バーの長さは既定で最大 40 セルで、帯が狭いときは帯に収まる長さに縮む。バーが2行に折り返す場合（フォントによっては、ブロック文字 `█░▒` が1セルより広く描かれる）は、各プラグインの `barWidth` 設定を小さくする。`/config` の一覧から変えるか、次のように設定する。
+
+```bash
+echo '{"barWidth":"30"}' | claude plugin configure context-bar@claude-code-bars --values-stdin
 ```
 
 ## context-bar

@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
 import { GLYPH, fmt, toSnapshot } from './bar'
-import { allocate, levelColor } from './shared'
+import { allocate, barWidth, levelColor } from './shared'
 
 const snapshot = atom({ plugin: 'context-bar', key: 'snapshot' } as const, null)
 const isHidden = atom({ plugin: 'context-bar', key: 'isHidden' } as const, false)
@@ -23,7 +23,9 @@ async function sync($: EngineInterface) {
   await refresh($)
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const cap = Number(options.barWidth)
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'context-bar',
@@ -72,7 +74,7 @@ export const register: Register = on => {
     const { Box, Text } = $.ui.resolve(e)
     const cells = allocate(
       snap.segments.map(s => s.tokens),
-      e.props.bodyColumns,
+      barWidth(cap, e.props.bodyColumns),
     )
     const level = levelColor(snap.percent)
 

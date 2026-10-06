@@ -104,19 +104,30 @@ test('header: used / window (percent) and the auto-compact point', async ($, on)
   }
 })
 
-test('bar fills the band width; legend skips deferred rows', async ($, on) => {
+test('bar is 40 cells by default, less on a narrow band; legend skips deferred rows', async ($, on) => {
   engine(on)
   await start($)
 
   for (const surface of SURFACES) {
+    const narrow = await mount($, surface, { ...BAND, bodyColumns: 30 })
+    expect((await narrow.find(BAR))?.text).toHaveLength(29)
+    await narrow.unmount()
+
     const ui = await mount($, surface)
-    expect((await ui.find(BAR))?.text).toHaveLength(WIDTH)
+    expect((await ui.find(BAR))?.text).toHaveLength(40)
     const legend = (await ui.find(LEGEND))?.text
     expect(legend).toContain('Messages 30k')
     expect(legend).toContain('Autocompact buffer 33k')
     expect(legend).not.toContain('MCP tools')
     await ui.unmount()
   }
+})
+
+test('the barWidth option sets the bar length', { options: { barWidth: 20 } }, async ($, on) => {
+  engine(on)
+  await start($)
+  const ui = await mount($, 'terminal')
+  expect((await ui.find(BAR))?.text).toHaveLength(20)
 })
 
 test('usage turns yellow at 50% and red at 80%', async ($, on) => {

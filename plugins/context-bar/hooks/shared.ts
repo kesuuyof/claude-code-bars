@@ -17,3 +17,12 @@ export function allocate(tokens: readonly number[], width: number): number[] {
 export function levelColor(percent: number): string | undefined {
   return percent >= 80 ? 'error' : percent >= 50 ? 'warning' : undefined
 }
+
+/**
+ * Cells for a bar: at most `cap` (the plugin's barWidth option), and short of the
+ * band by `beside` (what else its row holds) plus one cell, so a row never reaches
+ * the band's last column.
+ */
+export function barWidth(cap: number, bodyColumns: number, beside = 0): number {
+  return Math.max(0, Math.min(cap, bodyColumns - beside - 1))
+}

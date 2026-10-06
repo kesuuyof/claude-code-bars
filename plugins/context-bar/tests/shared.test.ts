@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { allocate, levelColor } from '../hooks/shared'
+import { allocate, barWidth, levelColor } from '../hooks/shared'
 
 describe('allocate', () => {
   test('fills the width exactly', () => {
@@ -29,4 +29,11 @@ test('levelColor: yellow from 50%, red from 80%', () => {
   expect(levelColor(79)).toBe('warning')
   expect(levelColor(80)).toBe('error')
   expect(levelColor(130)).toBe('error')
+})
+
+test('barWidth: capped, and short of the band by what else the row holds', () => {
+  expect(barWidth(40, 200)).toBe(40)
+  expect(barWidth(40, 30)).toBe(29)
+  expect(barWidth(40, 60, 25)).toBe(34)
+  expect(barWidth(40, 10, 25)).toBe(0)
 })

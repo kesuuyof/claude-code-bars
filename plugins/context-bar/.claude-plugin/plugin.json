@@ -1,7 +1,19 @@
 {
   "name": "context-bar",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A stacked bar above the prompt showing the context window by /context category.",
-  "author": { "name": "kesuuyof" },
+  "author": {
+    "name": "kesuuyof"
+  },
+  "userConfig": {
+    "barWidth": {
+      "type": "number",
+      "title": "Bar width",
+      "description": "The most cells a bar takes. Lower it if the bar wraps onto a second line.",
+      "default": 40,
+      "min": 10,
+      "max": 200
+    }
+  },
   "types": "./types/index.d.ts"
 }

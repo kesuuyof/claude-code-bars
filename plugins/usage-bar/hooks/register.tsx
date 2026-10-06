@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
 
 import { toRow } from './limits'
-import { allocate, levelColor } from './shared'
+import { allocate, barWidth, levelColor } from './shared'
 
 const limits = atom({ plugin: 'usage-bar', key: 'limits' } as const, [])
 const clock = atom({ plugin: 'usage-bar', key: 'now' } as const, 0)
@@ -24,7 +24,9 @@ async function sync($: EngineInterface) {
   await save($, (await $.session.usage()).rateLimits)
 }
 
-export const register: Register = on => {
+export const register: Register = (on, options) => {
+  const cap = Number(options.barWidth)
+
   on('session.start', async ($, e, next) => {
     await $.command.register({
       name: 'usage-bar',
@@ -68,13 +70,13 @@ export const register: Register = on => {
     const rows = list.map(l => toRow(l, now))
     const labelWidth = Math.max(...rows.map(r => r.label.length))
     const tailWidth = Math.max(...rows.map(r => r.tail.length))
-    const barWidth = Math.max(10, e.props.bodyColumns - labelWidth - 1 - tailWidth)
+    const width = barWidth(cap, e.props.bodyColumns, labelWidth + 1 + tailWidth)
 
     return (
       <Box flexDirection="column">
         {above}
         {rows.flatMap(r => {
-          const [filled = 0, empty = 0] = allocate([Math.min(r.used, 100), Math.max(0, 100 - r.used)], barWidth)
+          const [filled = 0, empty = 0] = allocate([Math.min(r.used, 100), Math.max(0, 100 - r.used)], width)
           const level = levelColor(r.used)
           const tone = level ? { color: level } : {}
           const row = (
