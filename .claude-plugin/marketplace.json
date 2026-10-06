@@ -7,6 +7,11 @@
       "name": "context-bar",
       "source": "./plugins/context-bar",
       "description": "A stacked bar above the prompt showing the context window by /context category."
+    },
+    {
+      "name": "usage-bar",
+      "source": "./plugins/usage-bar",
+      "description": "Bars above the prompt for each plan usage window, with time to reset and a pace warning."
     }
   ]
 }

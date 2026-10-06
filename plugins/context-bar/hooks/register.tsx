@@ -1,7 +1,8 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import { GLYPH, allocate, fmt, levelColor, toSnapshot } from './bar'
+import { GLYPH, fmt, toSnapshot } from './bar'
+import { allocate, levelColor } from './shared'
 
 const snapshot = atom({ plugin: 'context-bar', key: 'snapshot' } as const, null)
 const isHidden = atom({ plugin: 'context-bar', key: 'isHidden' } as const, false)
@@ -61,7 +62,8 @@ export const register: Register = on => {
     return next(e)
   })
 
-  // Wraps what the plugins beneath drew, so other bands stack under this one.
+  // Draws above what the plugins beneath drew (usage-bar draws below), so the
+  // two stack the same way whichever of them loads first.
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const below = await next(e)
     const snap = await read($, snapshot)

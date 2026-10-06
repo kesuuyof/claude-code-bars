@@ -1,0 +1,7 @@
+{
+  "name": "usage-bar",
+  "version": "0.1.0",
+  "description": "Bars above the prompt for each plan usage window, with time to reset and a pace warning.",
+  "author": { "name": "kesuuyof" },
+  "types": "./types/index.d.ts"
+}
