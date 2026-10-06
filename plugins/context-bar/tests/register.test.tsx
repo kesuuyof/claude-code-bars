@@ -1,0 +1,234 @@
+import { expect, mock, test } from 'claude-code/testing'
+import type { Engine } from 'claude-code/testing'
+import type { On, RenderPropsOf, SessionContextBreakdown } from 'claude-code'
+
+const SURFACES = ['terminal', 'desktop'] as const
+const WIDTH = 60
+const BAND: RenderPropsOf['AbovePrompt'] = {
+  hasSurvey: false,
+  isWorking: false,
+  maxRows: 10,
+  bodyColumns: WIDTH,
+  scroll: { offset: 0, bodyRows: 10 },
+  view: {},
+}
+
+/** A 200k window as /context breaks it down, with `messages` tokens of conversation. */
+function breakdown(messages: number): SessionContextBreakdown {
+  const used = 3_000 + 12_000 + messages
+  return {
+    categories: [
+      { name: 'System prompt', tokens: 3_000, color: 'inactive', isDeferred: false, kind: 'used' },
+      { name: 'System tools', tokens: 12_000, color: 'permission', isDeferred: false, kind: 'used' },
+      { name: 'MCP tools', tokens: 5_000, color: 'warning', isDeferred: true, kind: 'deferred' },
+      { name: 'Messages', tokens: messages, color: 'promptBorder', isDeferred: false, kind: 'used' },
+      { name: 'Free space', tokens: 200_000 - used - 33_000, color: 'inactive', isDeferred: false, kind: 'free' },
+      { name: 'Autocompact buffer', tokens: 33_000, color: 'inactive', isDeferred: false, kind: 'buffer' },
+    ],
+    totalTokens: used,
+    maxTokens: 200_000,
+    rawMaxTokens: 200_000,
+    autocompactSource: 'auto',
+    percentage: Math.round(used / 2_000),
+    gridRows: [],
+    model: 'claude-opus-5-5',
+    memoryFiles: [],
+    mcpTools: [],
+    agents: [],
+    autoCompactThreshold: 167_000,
+    isAutoCompactEnabled: true,
+    apiUsage: null,
+  }
+}
+
+/** Stands in for the engine: the usage op answers whatever `live.now` holds. */
+function engine(on: On, store: Record<string, unknown> = {}) {
+  const live = { now: breakdown(30_000), asked: [] as unknown[], clock: mock.clock(on) }
+  mock.store(on, store)
+  on('session.start', ($, e) => ({ cwd: e.cwd }))
+  on('session.measure', ($, e) => ({ changed: e.changed }))
+  on('ui.render', () => ({ type: 'engine', ref: 0 }))
+  on('classic.SessionStart', () => ({}))
+  on('command.register', ($, e) => ({ value: { command: e.name } }))
+  on('session.usage', ($, e) => {
+    live.asked.push(e.breakdown)
+    return { value: { startedAt: 0, context: { window: 200_000, breakdown: live.now }, rateLimits: [] } }
+  })
+  return live
+}
+
+// Text takes no key, so rows are found by what they show.
+const HEADER = { type: 'Text', text: /^Context / }
+const USAGE = { type: 'Text', text: /^[\d.]+[kM]? \/ [\d.]+[kM]? \(\d+%\)$/ }
+const BAR = { type: 'Text', text: /^[█░▒]+$/ }
+const LEGEND = { type: 'Text', text: /Free space/ }
+
+/**
+ * One row the engine keeps, as a compaction appends its boundary and summary.
+ * The kit has no stand-in for the store beneath session.append (an answer
+ * without next is skipped, next has nothing beneath), so the call rejects
+ * after the plugin's hook ran; what the test checks is the refresh it scheduled.
+ */
+const append = ($: Engine, uuid: string, agentId?: string) =>
+  $.session
+    .append({
+      message: { type: 'system', name: 'compact_boundary', content: [{ type: 'text', text: 'Conversation compacted' }] },
+      door: 'compaction',
+      origin: { kind: 'engine' },
+      uuid,
+      ...(agentId && { agentId }),
+    })
+    .catch(() => {})
+
+const start = ($: Engine) => $.session.start({ cwd: '/tmp', surface: 'terminal', isInteractive: true })
+const toggle = ($: Engine) =>
+  $.command.run({
+    command: 'context-bar',
+    args: '',
+    origin: { kind: 'composer' },
+    presentation: { isFullscreen: false, columns: 80 },
+  })
+const mount = ($: Engine, surface: (typeof SURFACES)[number], props = BAND) =>
+  $.ui.mount({ plugin: 'context-bar', surface, component: 'AbovePrompt', props })
+
+test('header: used / window (percent) and the auto-compact point', async ($, on) => {
+  const live = engine(on)
+  await start($)
+  expect(live.asked).toEqual(['summary'])
+
+  for (const surface of SURFACES) {
+    const ui = await mount($, surface)
+    expect((await ui.find(HEADER))?.text).toBe('Context 45k / 200k (23%) · auto-compact at 167k')
+    expect((await ui.find(USAGE))?.props.color).toBeUndefined()
+    await ui.unmount()
+  }
+})
+
+test('bar fills the band width; legend skips deferred rows', async ($, on) => {
+  engine(on)
+  await start($)
+
+  for (const surface of SURFACES) {
+    const ui = await mount($, surface)
+    expect((await ui.find(BAR))?.text).toHaveLength(WIDTH)
+    const legend = (await ui.find(LEGEND))?.text
+    expect(legend).toContain('Messages 30k')
+    expect(legend).toContain('Autocompact buffer 33k')
+    expect(legend).not.toContain('MCP tools')
+    await ui.unmount()
+  }
+})
+
+test('usage turns yellow at 50% and red at 80%', async ($, on) => {
+  const live = engine(on)
+  await start($)
+  const ui = await mount($, 'terminal')
+
+  live.now = breakdown(95_000) // 110k, 55%
+  await $.session.measure({ context: { window: 200_000 }, rateLimits: [], changed: ['context'] })
+  expect((await ui.find(USAGE))?.props.color).toBe('warning')
+
+  live.now = breakdown(150_000) // 165k, 83%
+  await $.session.measure({ context: { window: 200_000 }, rateLimits: [], changed: ['context'] })
+  expect((await ui.find(USAGE))?.props.color).toBe('error')
+})
+
+test('redraws once the rows a compaction appends have settled', async ($, on) => {
+  const live = engine(on)
+  await start($)
+  const ui = await mount($, 'terminal')
+
+  live.now = breakdown(5_000)
+  await append($, 'boundary')
+  await live.clock.advance(200)
+  await append($, 'summary') // restarts the wait
+  await live.clock.advance(200)
+  expect((await ui.find(HEADER))?.text).toContain('45k / 200k (23%)')
+  await live.clock.advance(100)
+  expect((await ui.find(HEADER))?.text).toContain('20k / 200k (10%)')
+})
+
+test("a subagent's rows do not trigger a refresh", async ($, on) => {
+  const live = engine(on)
+  await start($)
+  const ui = await mount($, 'terminal')
+
+  live.now = breakdown(5_000)
+  await append($, 'sub', 'agent-1')
+  await live.clock.advance(1_000)
+  expect((await ui.find(HEADER))?.text).toContain('45k / 200k (23%)')
+})
+
+test('redraws after /clear', async ($, on) => {
+  const live = engine(on)
+  await start($)
+  const ui = await mount($, 'terminal')
+
+  live.now = breakdown(0)
+  await $.classic.SessionStart({ source: 'clear' })
+  expect((await ui.find(HEADER))?.text).toContain('15k / 200k (8%)')
+})
+
+test('/context-bar toggles and the choice is stored', async ($, on) => {
+  engine(on)
+  await start($)
+  const ui = await mount($, 'terminal')
+
+  expect((await toggle($)).text).toBe('Context bar hidden.')
+  expect(await ui.find(HEADER)).toBeUndefined()
+  // /clear reloads the choice from the store
+  await $.classic.SessionStart({ source: 'clear' })
+  expect(await ui.find(HEADER)).toBeUndefined()
+
+  expect((await toggle($)).text).toBe('Context bar shown.')
+  expect(await ui.find(HEADER)).toBeDefined()
+  await $.classic.SessionStart({ source: 'clear' })
+  expect(await ui.find(HEADER)).toBeDefined()
+})
+
+test('a stored hide holds in the next session', async ($, on) => {
+  engine(on, { isHidden: true })
+  await start($)
+  const ui = await mount($, 'terminal')
+  expect(await ui.find(HEADER)).toBeUndefined()
+})
+
+test('yields the band to a survey', async ($, on) => {
+  engine(on)
+  await start($)
+  const ui = await mount($, 'terminal', { ...BAND, hasSurvey: true })
+  expect(await ui.find(HEADER)).toBeUndefined()
+})
+
+test(
+  'stacks with another band',
+  {
+    plugins: [
+      {
+        name: 'other-band',
+        register(on) {
+          on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
+            const below = await next(e)
+            const { Box, Text } = $.ui.resolve(e)
+            return (
+              <Box flexDirection="column">
+                <Text key="other">other band</Text>
+                {below}
+              </Box>
+            )
+          })
+        },
+      },
+    ],
+  },
+  async ($, on) => {
+    engine(on)
+    await start($)
+    for (const surface of SURFACES) {
+      const ui = await mount($, surface)
+      expect(await ui.find(HEADER)).toBeDefined()
+      expect(await ui.find({ type: 'Text', text: 'other band' })).toBeDefined()
+      await ui.unmount()
+    }
+  },
+)

@@ -1,0 +1,12 @@
+{
+  "name": "claude-code-bars",
+  "description": "Claude Code mods that draw bands above the prompt.",
+  "owner": { "name": "kesuuyof" },
+  "plugins": [
+    {
+      "name": "context-bar",
+      "source": "./plugins/context-bar",
+      "description": "A stacked bar above the prompt showing the context window by /context category."
+    }
+  ]
+}

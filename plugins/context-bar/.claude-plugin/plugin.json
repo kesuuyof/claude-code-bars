@@ -1,0 +1,7 @@
+{
+  "name": "context-bar",
+  "version": "0.1.0",
+  "description": "A stacked bar above the prompt showing the context window by /context category.",
+  "author": { "name": "kesuuyof" },
+  "types": "./types/index.d.ts"
+}
