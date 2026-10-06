@@ -50,7 +50,9 @@ const mount = ($: Engine, surface: (typeof SURFACES)[number], props = BAND) =>
 
 const ROW = (name: string) => ({ type: 'Text', text: new RegExp(`^${name} `) })
 const WARNING = { type: 'Text', text: /ahead of pace/ }
-const bar = (row: string) => row.match(/[█░]+/)?.[0].length
+// full and empty cells are the same glyph, so the bar is one run of it
+const bar = (row: string) => row.match(/█+/)?.[0].length
+const barStart = (row: string) => row.search(/█/)
 
 test('nothing until a response reports the windows', async ($, on) => {
   engine(on)
@@ -70,9 +72,11 @@ test('one bar per window, with percent and time to reset', async ($, on) => {
     const sevenDay = (await ui.find(ROW('7d')))?.text ?? ''
     expect(fiveHour).toEndWith(' 25% · resets in 3h30m')
     expect(sevenDay).toEndWith(' 18% · resets in 6d0h')
-    // the bars line up, short of the band by the label, the widest tail and a spare cell
-    expect(bar(fiveHour)).toBe(WIDTH - '5h '.length - ' 25% · resets in 3h30m'.length - 1)
-    expect(bar(sevenDay)).toBe(bar(fiveHour))
+    // context-bar's test pins the same numbers: a 60-column band puts both bars at 3, 32 cells long
+    for (const row of [fiveHour, sevenDay]) {
+      expect(barStart(row)).toBe(3)
+      expect(bar(row)).toBe(32)
+    }
     expect(await ui.find(WARNING)).toBeUndefined()
     await ui.unmount()
   }
@@ -92,6 +96,16 @@ test('the barWidth option sets the bar length', { options: { barWidth: 20 } }, a
   await measure($, windows(25))
   const ui = await mount($, 'terminal', { ...BAND, bodyColumns: 200 })
   expect(bar((await ui.find(ROW('5h')))?.text ?? '')).toBe(20)
+})
+
+test('empty cells are the same glyph as full ones, dimmed', async ($, on) => {
+  engine(on)
+  await start($)
+  await measure($, windows(25))
+  const ui = await mount($, 'terminal', { ...BAND, bodyColumns: 200 })
+  const [full, empty] = await ui.findAll({ type: 'Text', text: /^█+$/ })
+  expect([full?.text.length, full?.props.dimColor]).toEqual([10, undefined])
+  expect([empty?.text.length, empty?.props.dimColor]).toEqual([30, true])
 })
 
 test('bar and percent turn yellow at 50% and red at 80%', async ($, on) => {

@@ -60,7 +60,9 @@ function engine(on: On, store: Record<string, unknown> = {}) {
 // Text takes no key, so rows are found by what they show.
 const HEADER = { type: 'Text', text: /^Context / }
 const USAGE = { type: 'Text', text: /^[\d.]+[kM]? \/ [\d.]+[kM]? \(\d+%\)$/ }
-const BAR = { type: 'Text', text: /^[█░▒]+$/ }
+const BAR = { type: 'Text', text: /^ *█+$/ }
+/** Where the bar starts and how many cells it takes. */
+const grid = (text = '') => ({ start: text.search(/█/), cells: text.trimStart().length })
 const LEGEND = { type: 'Text', text: /Free space/ }
 
 /**
@@ -104,17 +106,18 @@ test('header: used / window (percent) and the auto-compact point', async ($, on)
   }
 })
 
-test('bar is 40 cells by default, less on a narrow band; legend skips deferred rows', async ($, on) => {
+test('bar starts at column 3, 40 cells by default and less on a narrow band; legend skips deferred rows', async ($, on) => {
   engine(on)
   await start($)
 
   for (const surface of SURFACES) {
-    const narrow = await mount($, surface, { ...BAND, bodyColumns: 30 })
-    expect((await narrow.find(BAR))?.text).toHaveLength(29)
+    // usage-bar's test pins the same numbers: a 60-column band puts both bars at 3, 32 cells long
+    const narrow = await mount($, surface)
+    expect(grid((await narrow.find(BAR))?.text)).toEqual({ start: 3, cells: 32 })
     await narrow.unmount()
 
-    const ui = await mount($, surface)
-    expect((await ui.find(BAR))?.text).toHaveLength(40)
+    const ui = await mount($, surface, { ...BAND, bodyColumns: 200 })
+    expect(grid((await ui.find(BAR))?.text)).toEqual({ start: 3, cells: 40 })
     const legend = (await ui.find(LEGEND))?.text
     expect(legend).toContain('Messages 30k')
     expect(legend).toContain('Autocompact buffer 33k')
@@ -123,11 +126,21 @@ test('bar is 40 cells by default, less on a narrow band; legend skips deferred r
   }
 })
 
+test('one glyph for every cell: free space and the buffer are dimmed, not drawn with ░ or ▒', async ($, on) => {
+  engine(on)
+  await start($)
+  const ui = await mount($, 'terminal', { ...BAND, bodyColumns: 200 })
+  const cells = (await ui.findAll({ type: 'Text', text: /^█+$/ })).map(t => ({ n: t.text.length, dim: t.props.dimColor === true }))
+  // System prompt, System tools, Messages; then Free space and Autocompact buffer
+  expect(cells.slice(0, 5).map(c => c.dim)).toEqual([false, false, false, true, true])
+  expect(cells.slice(0, 5).reduce((a, c) => a + c.n, 0)).toBe(40)
+})
+
 test('the barWidth option sets the bar length', { options: { barWidth: 20 } }, async ($, on) => {
   engine(on)
   await start($)
   const ui = await mount($, 'terminal')
-  expect((await ui.find(BAR))?.text).toHaveLength(20)
+  expect(grid((await ui.find(BAR))?.text).cells).toBe(20)
 })
 
 test('usage turns yellow at 50% and red at 80%', async ($, on) => {

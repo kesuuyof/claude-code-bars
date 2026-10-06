@@ -1,6 +1,6 @@
 {
   "name": "usage-bar",
-  "version": "0.2.0",
+  "version": "0.2.2",
   "description": "Bars above the prompt for each plan usage window, with time to reset and a pace warning.",
   "author": {
     "name": "kesuuyof"

@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { allocate, barWidth, levelColor } from '../hooks/shared'
+import { BAR_INDENT, allocate, barWidth, levelColor } from '../hooks/shared'
 
 describe('allocate', () => {
   test('fills the width exactly', () => {
@@ -31,9 +31,9 @@ test('levelColor: yellow from 50%, red from 80%', () => {
   expect(levelColor(130)).toBe('error')
 })
 
-test('barWidth: capped, and short of the band by what else the row holds', () => {
+test('barWidth: capped, and the same grid on any band', () => {
   expect(barWidth(40, 200)).toBe(40)
-  expect(barWidth(40, 30)).toBe(29)
-  expect(barWidth(40, 60, 25)).toBe(34)
-  expect(barWidth(40, 10, 25)).toBe(0)
+  expect(barWidth(40, 60)).toBe(60 - BAR_INDENT - 24 - 1)
+  expect(barWidth(20, 200)).toBe(20)
+  expect(barWidth(40, 20)).toBe(0)
 })

@@ -1,11 +1,16 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, Timer } from 'claude-code'
 
-import { GLYPH, fmt, toSnapshot } from './bar'
-import { allocate, barWidth, levelColor } from './shared'
+import type { Segment } from '../types'
+import { fmt, toSnapshot } from './bar'
+import { BAR_INDENT, CELL, allocate, barWidth, levelColor } from './shared'
 
 const snapshot = atom({ plugin: 'context-bar', key: 'snapshot' } as const, null)
 const isHidden = atom({ plugin: 'context-bar', key: 'isHidden' } as const, false)
+
+// Free space and the compaction buffer share their colors with used rows
+// (promptBorder, inactive), so they are told apart by being dimmed.
+const tone = (s: Segment) => ({ color: s.color, ...(s.kind !== 'used' && { dimColor: true }) })
 
 const SETTLE_MS = 300
 let pending: Timer | undefined
@@ -77,6 +82,7 @@ export const register: Register = (on, options) => {
       barWidth(cap, e.props.bodyColumns),
     )
     const level = levelColor(snap.percent)
+    const indent = ' '.repeat(BAR_INDENT)
 
     return (
       <Box flexDirection="column">
@@ -88,17 +94,19 @@ export const register: Register = (on, options) => {
           {snap.autoCompactAt === null ? '' : ` · auto-compact at ${fmt(snap.autoCompactAt)}`}
         </Text>
         <Text wrap="truncate-end">
+          {indent}
           {snap.segments.map((s, i) => {
             const n = cells[i] ?? 0
-            return n > 0 ? <Text color={s.color}>{GLYPH[s.kind].repeat(n)}</Text> : ''
+            return n > 0 ? <Text {...tone(s)}>{CELL.repeat(n)}</Text> : ''
           })}
         </Text>
         <Text wrap="truncate-end">
+          {indent}
           {snap.segments
             .filter(s => s.tokens > 0)
             .map(s => (
               <Text>
-                <Text color={s.color}>{GLYPH[s.kind]}</Text> {s.name} {fmt(s.tokens)}{'  '}
+                <Text {...tone(s)}>{CELL}</Text> {s.name} {fmt(s.tokens)}{'  '}
               </Text>
             ))}
         </Text>

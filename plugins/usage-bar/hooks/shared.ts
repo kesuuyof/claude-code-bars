@@ -19,10 +19,22 @@ export function levelColor(percent: number): string | undefined {
 }
 
 /**
- * Cells for a bar: at most `cap` (the plugin's barWidth option), and short of the
- * band by `beside` (what else its row holds) plus one cell, so a row never reaches
- * the band's last column.
+ * The one glyph every cell of every bar is drawn with; full and empty cells differ
+ * by color alone. A font that draws ░ or ▒ at another width than █ would otherwise
+ * make bars of the same cell count differ in length.
  */
-export function barWidth(cap: number, bodyColumns: number, beside = 0): number {
-  return Math.max(0, Math.min(cap, bodyColumns - beside - 1))
+export const CELL = '█'
+
+/**
+ * Every bar in the band sits on one grid, so bars stacked from different plugins
+ * line up: it starts BAR_INDENT cells in (after a label such as usage-bar's "5h "),
+ * and TAIL cells are kept right of it (for a tail such as " 60% · resets in 3h30m")
+ * plus one, so a row never reaches the band's last column.
+ */
+export const BAR_INDENT = 3
+const TAIL = 24
+
+/** Cells for a bar: at most `cap` (the plugin's barWidth option), the same for every plugin on a band. */
+export function barWidth(cap: number, bodyColumns: number): number {
+  return Math.max(0, Math.min(cap, bodyColumns - BAR_INDENT - TAIL - 1))
 }

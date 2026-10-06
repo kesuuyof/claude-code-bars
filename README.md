@@ -8,20 +8,22 @@ claude plugin install context-bar@claude-code-bars
 claude plugin install usage-bar@claude-code-bars
 ```
 
-両方を有効にすると、プロンプト上部の帯に context-bar が上、usage-bar が下の順で並ぶ。この順はプラグインの読み込み順によらない。
+両方を有効にすると、プロンプト上部の帯に context-bar が上、usage-bar が下の順で並ぶ。この順はプラグインの読み込み順によらない。どのバーも3列目から始まり、同じ帯の上では同じ長さになる。
+
+バーは全マスを `█` 1文字で描き、色で区別する。使用中の部分はカテゴリの色（usage-bar は使用率に応じた色）、空きとバッファは同じ色を薄く描く。`░` や `▒` を混ぜると、フォントによって文字幅が違い、バーの長さがずれるため。
 
 ```
 Context 45k / 200k (23%) · auto-compact at 167k
-█████████░░░░░░░░░░░░░░░░░░░░░░░░▒▒▒▒▒▒▒
-█ System prompt 3k  █ System tools 12k  █ Messages 30k  ░ Free space 122k  ▒ Autocompact buffer 33k
-5h ████████████████████████░░░░░░░░░░░░░░░░ 60% · resets in 3h30m
+   ████████████████████████████████████████
+   █ System prompt 3k  █ System tools 12k  █ Messages 30k  █ Free space 122k  █ Autocompact buffer 33k
+5h ████████████████████████████████████████ 60% · resets in 3h30m
    ⚠ ahead of pace: 60% used, 30% of the window elapsed
-7d ███████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░ 18% · resets in 6d0h
+7d ████████████████████████████████████████ 18% · resets in 6d0h
 ```
 
 ### バーの長さ
 
-バーの長さは既定で最大 40 セルで、帯が狭いときは帯に収まる長さに縮む。バーが2行に折り返す場合（フォントによっては、ブロック文字 `█░▒` が1セルより広く描かれる）は、各プラグインの `barWidth` 設定を小さくする。`/config` の一覧から変えるか、次のように設定する。
+バーの長さは既定で最大 40 セルで、帯が狭いときは、右側に usage-bar の「60% · resets in …」の分（24セル）を残して縮む。context-bar もこの余白を同じだけ取るので、両方のバーの長さはそろう。バーが2行に折り返す場合（フォントによっては、`█` が1セルより広く描かれる）は、各プラグインの `barWidth` 設定を小さくする。2つのプラグインに同じ値を入れないと、バーの長さがそろわない。`/config` の一覧から変えるか、次のように設定する。
 
 ```bash
 echo '{"barWidth":"30"}' | claude plugin configure context-bar@claude-code-bars --values-stdin

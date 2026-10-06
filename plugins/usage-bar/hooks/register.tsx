@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionRateLimit } from 'claude-code'
 
 import { toRow } from './limits'
-import { allocate, barWidth, levelColor } from './shared'
+import { BAR_INDENT, CELL, allocate, barWidth, levelColor } from './shared'
 
 const limits = atom({ plugin: 'usage-bar', key: 'limits' } as const, [])
 const clock = atom({ plugin: 'usage-bar', key: 'now' } as const, 0)
@@ -68,9 +68,9 @@ export const register: Register = (on, options) => {
     const { Box, Text } = $.ui.resolve(e)
     const now = await read($, clock)
     const rows = list.map(l => toRow(l, now))
-    const labelWidth = Math.max(...rows.map(r => r.label.length))
-    const tailWidth = Math.max(...rows.map(r => r.tail.length))
-    const width = barWidth(cap, e.props.bodyColumns, labelWidth + 1 + tailWidth)
+    // A label longer than the grid's indent ("7d opus") pushes this band's bars right of it.
+    const indent = Math.max(BAR_INDENT, ...rows.map(r => r.label.length + 1))
+    const width = barWidth(cap, e.props.bodyColumns)
 
     return (
       <Box flexDirection="column">
@@ -81,9 +81,9 @@ export const register: Register = (on, options) => {
           const tone = level ? { color: level } : {}
           const row = (
             <Text wrap="truncate-end">
-              {r.label.padEnd(labelWidth)}{' '}
-              <Text {...tone}>{'█'.repeat(filled)}</Text>
-              <Text dimColor>{'░'.repeat(empty)}</Text>
+              {r.label.padEnd(indent)}
+              <Text {...tone}>{CELL.repeat(filled)}</Text>
+              <Text dimColor>{CELL.repeat(empty)}</Text>
               <Text {...tone}>{r.tail}</Text>
             </Text>
           )
@@ -91,7 +91,7 @@ export const register: Register = (on, options) => {
           return [
             row,
             <Text color="warning" wrap="truncate-end">
-              {' '.repeat(labelWidth + 1)}
+              {' '.repeat(indent)}
               {r.warning}
             </Text>,
           ]

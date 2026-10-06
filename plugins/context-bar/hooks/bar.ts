@@ -1,8 +1,6 @@
 import type { SessionContextBreakdown } from 'claude-code'
 
-import type { Segment, Snapshot } from '../types'
-
-export const GLYPH: Record<Segment['kind'], string> = { used: '█', free: '░', buffer: '▒' }
+import type { Snapshot } from '../types'
 
 /** Keeps the rows that take room in the window, as /context's grid does. */
 export function toSnapshot(b: SessionContextBreakdown): Snapshot {
